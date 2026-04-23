@@ -1,63 +1,113 @@
-name: Build Android APK
+name: Build Android APK [Optimized]
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:  # 手动触发
+    branches: [ main, master ]  
+  workflow_dispatch:
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    env:
+      ANDROID_HOME: /home/runner/android-sdk
+      ANDROID_NDK_ROOT: /home/runner/android-ndk-r26c
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Debug - List files
+      run: |
+        echo "Repository structure:"
+        find . -type f -name "*.py" -o -name "*.spec" -o -name "*.yml" -o -name "*.yaml" | sort
+        
+    - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
         
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
-        sudo apt update
-        sudo apt install -y git openjdk-8-jdk unzip wget curl
-        pip install buildozer
+        echo "正在安装系统依赖..."
+        sudo apt update -y -qq
+        sudo apt install -y -qq git openjdk-11-jdk unzip wget
         
-    - name: Setup Android environment
+    - name: Setup swap space
       run: |
-        mkdir -p $HOME/android-sdk/cmdline-tools
-        wget -O sdk-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
-        unzip sdk-tools.zip -d $HOME/android-sdk/cmdline-tools
-        mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
-        export ANDROID_HOME=$HOME/android-sdk
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
-        
-    - name: Setup NDK
-      run: |
-        export ANDROID_HOME=$HOME/android-sdk
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
-        wget -O ndk.zip "https://dl.google.com/android/repository/android-ndk-r25b-linux.zip"
-        unzip ndk.zip -d $HOME/
-        
-    - name: Increase memory
-      run: |
-        sudo fallocate -l 8G /swapfile
+        echo "正在创建8GB swap空间..."
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
-          
+        
+    - name: Install Buildozer
+      run: |
+        python -m pip install --upgrade pip
+        pip install \"cython>=0.29,<3.0\"
+        pip install buildozer
+        
+    - name: Setup Android SDK
+      run: |
+        echo "正在设置Android SDK..."
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        wget -q -O sdk-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+        unzip -q sdk-tools.zip -d $ANDROID_HOME/cmdline-tools
+        mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
+        
+    - name: Setup Android NDK
+      run: |
+        echo "正在设置Android NDK..."
+        wget -q -O ndk.zip "https://dl.google.com/android/repository/android-ndk-r25b-linux.zip"
+        unzip -q ndk.zip -d /tmp/
+        mv /tmp/android-ndk-r25b $ANDROID_NDK_ROOT
+        
+    - name: Configure Buildozer
+      run: |
+        cat > buildozer.spec << 'EOF'
+[app]
+title = Mouse Clicker
+package.name = mouseclicker
+package.domain = com.birdshit34
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+requirements = python,kivy
+version = 1.0.0
+[app:android]
+android.permissions = SYSTEM_ALERT_WINDOW
+android.api = 30
+android.minapi = 21
+[buildozer]
+log_level = 2
+EOF
+        
     - name: Build APK
       run: |
-        export ANDROID_HOME=$HOME/android-sdk; 
+        echo "开始构建APK，预计需要20-30分钟..."
         export PATH=$PATH:$ANDROID_HOME/platform-tools
-        buildozer -v android debug
+        timeout 1800 buildozer -v android debug
         
-- name: Upload APK
-  uses: actions/upload-artifact@v4
-  if: success()
-  with:
-    name: MouseClicker-APK
-    path: bin/*.apk
-    retention-days: 90
+    - name: Upload APK as Artifact
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() && always() }}
+      with:
+        name: MouseClicker-APK-v${{ github.run_number }}
+        path: |
+          bin/*.apk
+          *.log
+        retention-days: 90
+        
+    - name: Display success
+      if: ${{ success() }}
+      run: |
+        echo "✅ BUILD SUCCESSFUL!"
+        echo "APK已上传，请下载 Artifacts"
+        
+    - name: Display failure
+      if: ${{ failure() }}
+      run: |
+        echo "❌ BUILD FAILED - 查看上方日志"
