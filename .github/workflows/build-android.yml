@@ -8,13 +8,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     
     steps:
       - uses: actions/checkout@v4
         
       - name: Setup Python
-        uses: actions/setup-python@v5 
+        uses: actions/setup-python@v5
         with:
           python-version: '3.8'
         
@@ -26,17 +26,54 @@ jobs:
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-          free -h
+        
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@v3
+        with:
+          path: ~/.buildozer/android/platform/android-ndk-r25b
+          key: ${{ runner.os }}-ndk-r25b
+        
+      - name: Download Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.buildozer/android/platform
+          cd ~/.buildozer/android/platform
+          wget -c https://dl.google.com/android/repository/android-ndk-r25b-linux-x86_64.zip
+          unzip -q android-ndk-r25b-linux-x86_64.zip
+          rm android-ndk-r25b-linux-x86_64.zip
         
       - name: Install dependencies
+        run: pip install buildozer==1.2.0 cython==0.29.36 --no-cache-dir
+        
+      - name: Create buildozer.spec
         run: |
-          pip install buildozer==1.2.0 cython==0.29.36 --no-cache-dir
+          cat > buildozer.spec << 'EOF'
+[app]
+title = Mouse Clicker
+package.name = mouseclicker
+package.domain = com.birdshit34
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+requirements = python,kivy
+version = 1.0.0
+
+[app:android]
+android.permissions = SYSTEM_ALERT_WINDOW
+android.api = 30
+android.minapi = 21
+android.ndk = 25b
+
+[buildozer]
+log_level = 2
+EOF
         
       - name: Build APK
         run: buildozer -v android debug build
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: MouseClicker-APK
           path: bin/*.apk
