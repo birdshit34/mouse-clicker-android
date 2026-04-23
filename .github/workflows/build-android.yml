@@ -48,25 +48,23 @@ jobs:
         
       - name: Create buildozer.spec
         run: |
-          cat > buildozer.spec << 'EOF'
-[app]
-title = Mouse Clicker
-package.name = mouseclicker
-package.domain = com.birdshit34
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
-requirements = python,kivy
-version = 1.0.0
-
-[app:android]
-android.permissions = SYSTEM_ALERT_WINDOW
-android.api = 30
-android.minapi = 21
-android.ndk = 25b
-
-[buildozer]
-log_level = 2
-EOF
+          echo "[app]" > buildozer.spec
+          echo "title = Mouse Clicker" >> buildozer.spec
+          echo "package.name = mouseclicker" >> buildozer.spec
+          echo "package.domain = com.birdshit34" >> buildozer.spec
+          echo "source.dir = ." >> buildozer.spec
+          echo "source.include_exts = py,png,jpg,kv,atlas" >> buildozer.spec
+          echo "requirements = python,kivy" >> buildozer.spec
+          echo "version = 1.0.0" >> buildozer.spec
+          echo "" >> buildozer.spec
+          echo "[app:android]" >> buildozer.spec
+          echo "android.permissions = SYSTEM_ALERT_WINDOW" >> buildozer.spec
+          echo "android.api = 30" >> buildozer.spec
+          echo "android.minapi = 21" >> buildozer.spec
+          echo "android.ndk = 25b" >> buildozer.spec
+          echo "" >> buildozer.spec
+          echo "[buildozer]" >> buildozer.spec
+          echo "log_level = 2" >> buildozer.spec
         
       - name: Build APK
         run: buildozer -v android debug build
