@@ -1,0 +1,62 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git openjdk-8-jdk unzip wget curl
+        pip install buildozer
+        
+    - name: Setup Android environment
+      run: |
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        wget -O sdk-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
+        unzip sdk-tools.zip -d $HOME/android-sdk/cmdline-tools
+        mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+        export ANDROID_HOME=$HOME/android-sdk
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses
+        
+    - name: Setup NDK
+      run: |
+        export ANDROID_HOME=$HOME/android-sdk
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools"
+        wget -O ndk.zip "https://dl.google.com/android/repository/android-ndk-r25b-linux.zip"
+        unzip ndk.zip -d $HOME/
+        
+    - name: Increase memory
+      run: |
+        sudo fallocate -l 8G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+          
+    - name: Build APK
+      run: |
+        export ANDROID_HOME=$HOME/android-sdk; 
+        export PATH=$PATH:$ANDROID_HOME/platform-tools
+        buildozer -v android debug
+        
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      if: success()
+      with:
+        name: MouseClicker-APK
+        path: bin/*.apk
