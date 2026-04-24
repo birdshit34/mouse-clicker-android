@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     
     steps:
       - uses: actions/checkout@v4
@@ -16,7 +16,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.10'
         
       - name: Setup swap
         run: |
@@ -29,18 +29,31 @@ jobs:
         
       - name: Setup Android SDK
         run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
-          cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+          # 设置 Android SDK 目录
+          export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
+          export ANDROID_SDK_ROOT=\
+          
+          mkdir -p \/cmdline-tools
+          cd \/cmdline-tools
+          
+          # 下载命令行工具
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
           unzip -q cmdtools.zip
-          mv cmdline-tools latest
           rm cmdtools.zip
-          # 创建buildozer期望的tools目录结构
-          cd ~/.buildozer/android/platform/android-sdk
-          mkdir -p tools/bin
-          ln -s ../cmdline-tools/latest/bin/sdkmanager tools/bin/sdkmanager
-          ln -s ../cmdline-tools/latest/bin/avdmanager tools/bin/avdmanager
-          yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+          
+          # 重命名为 latest (buildozer 期望的结构)
+          mv cmdline-tools latest
+          
+          # 设置环境变量
+          echo "ANDROID_HOME=\" >> \
+          echo "ANDROID_SDK_ROOT=\" >> \
+          echo "\/cmdline-tools/latest/bin" >> \
+          
+          # 接受许可证
+          yes | \/cmdline-tools/latest/bin/sdkmanager --licenses
+          
+          # 安装必要的 SDK 组件
+          \/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
         
       - name: Cache Android NDK
         id: cache-ndk
@@ -59,29 +72,37 @@ jobs:
           rm ndk.zip
         
       - name: Install dependencies
-        run: pip install buildozer==1.2.0 cython==0.29.36 --no-cache-dir
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.36 --no-cache-dir
         
       - name: Create buildozer.spec
         run: |
-          echo "[app]" > buildozer.spec
-          echo "title = Mouse Clicker" >> buildozer.spec
-          echo "package.name = mouseclicker" >> buildozer.spec
-          echo "package.domain = com.birdshit34" >> buildozer.spec
-          echo "source.dir = ." >> buildozer.spec
-          echo "source.include_exts = py,png,jpg,kv,atlas" >> buildozer.spec
-          echo "requirements = python,kivy" >> buildozer.spec
-          echo "version = 1.0.0" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "[app:android]" >> buildozer.spec
-          echo "android.permissions = SYSTEM_ALERT_WINDOW" >> buildozer.spec
-          echo "android.api = 30" >> buildozer.spec
-          echo "android.minapi = 21" >> buildozer.spec
-          echo "" >> buildozer.spec
-          echo "[buildozer]" >> buildozer.spec
-          echo "log_level = 2" >> buildozer.spec
+          cat > buildozer.spec << 'EOF'
+[app]
+title = Mouse Clicker
+package.name = mouseclicker
+package.domain = com.birdshit34
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+requirements = python3,kivy
+version = 1.0.0
+
+[app:android]
+android.permissions = SYSTEM_ALERT_WINDOW
+android.api = 30
+android.minapi = 21
+android.ndk = 25b
+
+[buildozer]
+log_level = 2
+EOF
         
       - name: Build APK
-        run: buildozer -v android debug build
+        run: |
+          export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
+          export ANDROID_SDK_ROOT=\
+          buildozer -v android debug
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
