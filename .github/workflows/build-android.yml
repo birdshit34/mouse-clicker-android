@@ -27,6 +27,16 @@ jobs:
           sudo mkswap /swapfile
           sudo swapon /swapfile
         
+      - name: Setup Android SDK
+        run: |
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
+          cd ~/.buildozer/android/platform/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdtools.zip
+          unzip -q cmdtools.zip
+          mv cmdline-tools latest
+          rm cmdtools.zip
+          yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+        
       - name: Cache Android NDK
         id: cache-ndk
         uses: actions/cache@v3
@@ -61,17 +71,9 @@ jobs:
           echo "android.permissions = SYSTEM_ALERT_WINDOW" >> buildozer.spec
           echo "android.api = 30" >> buildozer.spec
           echo "android.minapi = 21" >> buildozer.spec
-          echo "android.skip_update = False" >> buildozer.spec
           echo "" >> buildozer.spec
           echo "[buildozer]" >> buildozer.spec
           echo "log_level = 2" >> buildozer.spec
-        
-      - name: Accept Android SDK licenses
-        run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools
-          if [ -d ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest ]; then
-            yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          fi
         
       - name: Build APK
         run: buildozer -v android debug build
