@@ -43,14 +43,14 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
         
-      - name: Cache Android NDK
+      - name: Cache Android NBK
         id: cache-ndk
         uses: actions/cache@v3
         with:
           path: ~/.buildozer/android/platform/android-ndk-r25b
           key: ndk-r25b-final
         
-      - name: Download Android NDK r25b
+      - name: Download Android NBK r25b
         if: steps.cache-ndk.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.buildozer/android/platform
@@ -66,25 +66,7 @@ jobs:
         
       - name: Create buildozer.spec
         run: |
-          cat > buildozer.spec << 'EOF'
-[app]
-title = Mouse Clicker
-package.name = mouseclicker
-package.domain = com.birdshit34
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas
-requirements = python3,kivy
-version = 1.0.0
-
-[app:android]
-android.permissions = SYSTEM_ALERT_WINDOW
-android.api = 30
-android.minapi = 21
-android.ndk = 25b
-
-[buildozer]
-log_level = 2
-EOF
+          printf '[app]\ntitle = Mouse Clicker\npackage.name = mouseclicker\npackage.domain = com.birdshit34\nsource.dir = .\nsource.include_exts = py,png,jpg,kv,atlas\nrequirements = python3,kivy\nversion = 1.0.0\n\n[app:android]\nandroid.permissions = SYSTEM_ALERT_WINDOW\nandroid.api = 30\nandroid.minapi = 21\nandroid.ndk = 25b\n\n[buildozer]\nlog_level = 2\n' > buildozer.spec
         
       - name: Build APK
         run: |
