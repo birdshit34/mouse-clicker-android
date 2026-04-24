@@ -35,6 +35,11 @@ jobs:
           unzip -q cmdtools.zip
           mv cmdline-tools latest
           rm cmdtools.zip
+          # 创建buildozer期望的tools目录结构
+          cd ~/.buildozer/android/platform/android-sdk
+          mkdir -p tools/bin
+          ln -s ../cmdline-tools/latest/bin/sdkmanager tools/bin/sdkmanager
+          ln -s ../cmdline-tools/latest/bin/avdmanager tools/bin/avdmanager
           yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
         
       - name: Cache Android NDK
@@ -42,7 +47,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.buildozer/android/platform/android-ndk-r25b
-          key: ndk-r25b-official
+          key: ndk-r25b-final
         
       - name: Download Android NDK r25b
         if: steps.cache-ndk.outputs.cache-hit != 'true'
