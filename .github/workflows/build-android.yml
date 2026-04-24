@@ -1,82 +1,24 @@
-name: Build Android APK
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    
-    steps:
-      - uses: actions/checkout@v4
-        
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-        
-      - name: Setup swap
-        run: |
-          sudo swapoff -a || true
-          sudo rm -f /swapfile || true
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-        
       - name: Setup Android SDK
         run: |
-          export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
+          
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
+          
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
           unzip -q cmdtools.zip
           rm cmdtools.zip
           mv cmdline-tools latest
+          
+          # Create symlinks for buildozer compatibility
+          mkdir -p $ANDROID_HOME/tools/bin
+          ln -s $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager $ANDROID_HOME/tools/bin/sdkmanager
+          ln -s $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager $ANDROID_HOME/tools/bin/avdmanager
+          
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
-        
-      - name: Cache Android NBK
-        id: cache-ndk
-        uses: actions/cache@v3
-        with:
-          path: ~/.buildozer/android/platform/android-ndk-r25b
-          key: ndk-r25b-final
-        
-      - name: Download Android NBK r25b
-        if: steps.cache-ndk.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/.buildozer/android/platform
-          cd ~/.buildozer/android/platform
-          wget --no-check-certificate "https://dl.google.com/android/repository/android-ndk-r25b-linux.zip" -O ndk.zip
-          unzip -q ndk.zip
-          rm ndk.zip
-        
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.36 --no-cache-dir
-        
-      - name: Create buildozer.spec
-        run: |
-          printf '[app]\ntitle = Mouse Clicker\npackage.name = mouseclicker\npackage.domain = com.birdshit34\nsource.dir = .\nsource.include_exts = py,png,jpg,kv,atlas\nrequirements = python3,kivy\nversion = 1.0.0\n\n[app:android]\nandroid.permissions = SYSTEM_ALERT_WINDOW\nandroid.api = 30\nandroid.minapi = 21\nandroid.ndk = 25b\n\n[buildozer]\nlog_level = 2\n' > buildozer.spec
-        
-      - name: Build APK
-        run: |
-          export ANDROID_HOME=~/.buildozer/android/platform/android-sdk
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
-          buildozer -v android debug
-        
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: MouseClicker-APK
-          path: bin/*.apk
